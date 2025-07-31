@@ -122,7 +122,7 @@ def load_icon(icon_path):
 
 
 # --- Constants ---
-MENU_ITEMS_DIR = Path(__file__).parent.parent / "menu_items"  # [新增] 生成器產出的插件目錄
+MENU_ITEMS_DIR = Path(__file__).parent.parent / "menuitems"  # [新增] 生成器產出的插件目錄
 MAIN_MENU_OBJECT_NAME = "MyCustomToolsMainMenu"
 
 

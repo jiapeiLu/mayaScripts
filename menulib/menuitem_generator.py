@@ -201,7 +201,7 @@ class MenuItemGenerator(QMainWindow):
         self.resize(1000, 700)
         
         # 設定輸出目錄
-        self.output_dir = Path(__file__).parent.parent / "menu_items"
+        self.output_dir = Path(__file__).parent.parent / "menuitems"
         self.output_dir.mkdir(exist_ok=True)
         
         # 當前編輯的檔案路徑（用於更新現有檔案）
