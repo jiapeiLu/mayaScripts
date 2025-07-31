@@ -65,7 +65,7 @@ your_project/
 
 ```python
 # 導入並初始化菜單
-import menu_manager
+import menulib.menu_manager as menu_manager
 menu_manager.initialize_menu()
 ```
 
@@ -73,7 +73,7 @@ menu_manager.initialize_menu()
 
 ```python
 # 啟動菜單項目生成器
-import menu_manager
+import menulib.menu_manager as menu_manager
 menu_manager.show_generator()
 ```
 
