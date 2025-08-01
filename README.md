@@ -16,22 +16,23 @@ Inside the folder, shift and right-click the mouse. Choose 'Open PowerShell wind
 mayapy.exe -m pip install --user numpy
 ```
 
-or
+or try
 
 ```shell
 .\mayapy.exe -m pip install --user numpy
 ```
-
+if you have target project script folder
+```shell
+.\mayapy.exe -m pip install numpy --target "path\to\project\scripts"
+```
 
 Maya Usage:
 
 `Python`
 ```python
 import vtxMatch
-from importlib import reload
-reload(vtxMatch)
+vtxMatch.main()
 ```
-
 
 # menulib 系統提供了以下功能：
 - 自動掃描和載入插件
@@ -49,7 +50,7 @@ your_project/
 ├── menulib/                 # 核心庫
 │   ├── __init__.py
 │   ├── config.json           # 設定
-│   ├── plugin_interface.py   # 插件接口
+│   ├── menuitem_interface.py   # 插件接口
 │   ├── ui_mixins.py          # UI 混合類
 │   └── menu_item_generator.py # 生成器工具
 └── menuitems/             
