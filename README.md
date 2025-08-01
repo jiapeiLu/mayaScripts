@@ -19,7 +19,7 @@ mayapy.exe -m pip install --user numpy
 or
 
 ```shell
-.\mayapy.exe -m pip install --user
+.\mayapy.exe -m pip install --user numpy
 ```
 
 
