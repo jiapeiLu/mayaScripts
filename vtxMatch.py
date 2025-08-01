@@ -4,21 +4,22 @@ Match postion and normal vertex from act vertex to ref vertex.
 Need numpy
 Usage:
 import vtxMatch
-from importlib import reload
-reload(vtxMatch)
+vtxMatch.main()
 
 '''
-import maya.cmds as cmds
-import sys
-try:
-    import numpy
-except ImportError:
-    sys.exit("This script requires the numpy module")
-
-
 __author__ = "Jiapei Lu"
 __email__ = "aurora.lu@gmail.com"
-__version__ = "1.0.3"
+__version__ = "1.0.4"
+
+
+import maya.cmds as cmds
+import sys
+
+try:
+    import numpy
+except ImportError as e:
+    
+    raise RuntimeError(f"\n This script requires the numpy module\n{e}")
 
 
 class PostionMatcher():
@@ -83,20 +84,21 @@ def matchVertexs(*args):
         print('=== Match Vertex Done ===')
 
 
-wd_Match_Vertexs = 'Match_Vertexs'
-if cmds.window(wd_Match_Vertexs, q=True, ex=True):
-    cmds.deleteUI(wd_Match_Vertexs)
+def main():
+    wd_Match_Vertexs = 'Match_Vertexs'
+    if cmds.window(wd_Match_Vertexs, q=True, ex=True):
+        cmds.deleteUI(wd_Match_Vertexs)
 
-wd_Match_Vertexs = cmds.window(wd_Match_Vertexs, title='Match Vertexs')
-cmds.columnLayout(adjustableColumn=True, rs=5, cw=160)
-cmds.button(label="Get Source Objects", command=getRefVertex)
-cmds.button(label="Get Target Objects", command=getActVerex)
-cmds.rowLayout(h=22, numberOfColumns=2, columnWidth2=(80, 75), adjustableColumn=True,
-               columnAlign=(1, 'left'), columnAttach=[(1, 'both', 0), (2, 'both', 0)])
-cmds.text(l='Threshold:', al='right')
-Threshold = cmds.floatField(minValue=0, maxValue=10, value=1, step=0.1, pre=1)
-cmds.setParent('..')
-normal = cmds.checkBox(label='Copy Vertex Normal', v=True)
-cmds.button(label="Match Vertexs", command=matchVertexs)
+    wd_Match_Vertexs = cmds.window(wd_Match_Vertexs, title='Match Vertexs')
+    cmds.columnLayout(adjustableColumn=True, rs=5, cw=160)
+    cmds.button(label="Get Source Objects", command=getRefVertex)
+    cmds.button(label="Get Target Objects", command=getActVerex)
+    cmds.rowLayout(h=22, numberOfColumns=2, columnWidth2=(80, 75), adjustableColumn=True,
+                   columnAlign=(1, 'left'), columnAttach=[(1, 'both', 0), (2, 'both', 0)])
+    cmds.text(l='Threshold:', al='right')
+    Threshold = cmds.floatField(minValue=0, maxValue=10, value=1, step=0.1, pre=1)
+    cmds.setParent('..')
+    normal = cmds.checkBox(label='Copy Vertex Normal', v=True)
+    cmds.button(label="Match Vertexs", command=matchVertexs)
 
-cmds.showWindow(wd_Match_Vertexs)
+    cmds.showWindow(wd_Match_Vertexs)
