@@ -22,8 +22,8 @@ LANG = {
         "en_us": "Quick Template",
     },
     "basic_group": {
-        "zh_tw": "基本設定",
-        "en_us": "Settings",
+        "zh_tw": "類別設定",
+        "en_us": "Class Settings",
     },
     "menu_path_edit_setplaceholdertext": {
         "zh_tw": "工具/綁定",
@@ -342,8 +342,8 @@ LANG = {
         "en_us": "# Open options window\n# Example: show settings dialog",
     },
     "script_runner_template": {
-        "zh_tw": "# 執行外部腳本文件\n# execfile('/path/to/your/script.py')",
-        "en_us": "# Execute external script file\n# execfile('/path/to/your/script.py')",
+        "zh_tw": "# 執行外部腳本文件\nexec(open(r'path/script.py', encoding='utf-8').read())",
+        "en_us": "# Execute external script file\nexec(open(r'path/script.py', encoding='utf-8').read())",
     },
     
     # Action text for file operations

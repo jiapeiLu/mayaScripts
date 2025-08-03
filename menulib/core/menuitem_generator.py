@@ -18,6 +18,8 @@ import maya.cmds as cmds
 import maya.OpenMayaUI as omui
 from shiboken2 import wrapInstance
 
+
+
 config =  {}  # 這裡的 config 將在後續函數中被初始化
 
 def set_config(config_data):
@@ -26,20 +28,19 @@ def set_config(config_data):
 
 def _initialize_language():
     """初始化語言設定"""
-    # config imports
-
     # language imports
     import importlib
-    from menulib.languagelib import language_manager
-    importlib.reload(language_manager)  # 確保載入最新版本
-    TRANS = language_manager.languageManager
+    from menulib.languagelib.language_manager import LanguageManager
+    import menulib.languagelib.language as lang
+    importlib.reload(lang)  # 確保載入最新版本
 
     language = config.get('language', 'en_us')
-    TRANS.set_language(language)
-    return TRANS.tr  # 簡化翻譯函數調用
+    lLanguageManager = LanguageManager(lang='en_us', languages=lang.LANG)
+    lLanguageManager.set_language(language)
 
-# 初始化翻譯函數
-tr = _initialize_language()  
+    return lLanguageManager.tr  # 簡化翻譯函數調用
+
+tr = _initialize_language()
 
 
 def get_maya_main_window():
@@ -64,7 +65,7 @@ class DataBindingManager:
             self.validation_rules[key] = validation_func
     
     def sync_data_to_widgets(self, data):
-        """將數據同步到 UI 元件"""
+        """將數據字典同步到 UI 元件"""
         for key, (widget, property_name) in self.binding_map.items():
             value = data.get(key)
             if value is not None:
@@ -143,8 +144,9 @@ class MenuItemGenerator(QMainWindow):
         self.data_binding = DataBindingManager()
         
         self.setup_ui()
+        self.set_template_combo()
         self.setup_data_binding()
-
+        self.setup_data_binding_signals()
         self._init_from()
     
     def _init_from(self):
@@ -152,8 +154,6 @@ class MenuItemGenerator(QMainWindow):
         self.current_file_data = None
         self.current_menuitem_index = 0
         self._clear_form()
-        self.load_templates()
-        self.setup_data_binding_signals()
         self.add_new_menuitem()
         self.on_template_changed(self.template_combo.currentText())
 
@@ -348,17 +348,22 @@ class MenuItemGenerator(QMainWindow):
 
     def setup_data_binding_signals(self):
         """設置數據綁定相關的信號連接"""
-        for widget in [self.action_name_edit, self.menu_path_edit, self.icon_path_edit, 
-                       self.widget_class_edit, self.ui_name_edit]:
-            widget.textChanged.connect(self.on_data_changed)
-            
-        for widget in [self.main_command_edit, self.option_command_edit]:
-            widget.textChanged.connect(self.on_data_changed)
+        signal_map = {
+            'text': 'textChanged',
+            'plainText': 'textChanged',  # QTextEdit 也是 textChanged
+            'value': 'valueChanged',
+            'checked': 'toggled',
+            'currentText': 'currentTextChanged',
+        }
 
-        for widget in [self.separator_check, self.has_option_check, self.has_dockable_check]:
-            widget.toggled.connect(self.on_data_changed)
-            
-        self.order_spin.valueChanged.connect(self.on_data_changed)
+        for key, (widget, property_name) in self.data_binding.binding_map.items():
+            signal_name = signal_map.get(property_name)
+            if signal_name:
+                signal = getattr(widget, signal_name, None)
+                if signal:
+                    signal.connect(self.on_data_changed)
+                else:
+                    print(f"⚠️ 找不到 {widget} 的 signal: {signal_name}")
 
     def on_data_changed(self):
         """當數據改變時的回調"""
@@ -367,10 +372,6 @@ class MenuItemGenerator(QMainWindow):
     def sync_data_to_form(self, data):
         """將給定的資料字典內容同步到 UI 表單"""
         self.data_binding.sync_data_to_widgets(data)
-        
-        self.update_icon_preview(data.get('icon_path', ''))
-        self.toggle_option_ui(data.get('has_option', False))
-        self.toggle_dockable_ui(data.get('has_dockable', False))
         
         self.update_preview()
 
@@ -383,15 +384,13 @@ class MenuItemGenerator(QMainWindow):
             QMessageBox.warning(self, tr("validation_error_title"), error_msg)
             return None
         
-        # 自動生成 class_name
-        data['class_name'] = self.generate_class_name(data.get('action_name', 'Unnamed'))
         return data
 
     def get_default_menuitem_data(self):
         """獲取預設的 menuitem 數據"""
-        return {
-            'class_name': 'NewMenuItem',
-            'action_name': '',
+        data ={
+            'class_name': '',
+            'action_name': 'Buttton Name',
             'menu_path': 'Tools',
             'order': 100,
             'separator_after': False,
@@ -404,28 +403,35 @@ class MenuItemGenerator(QMainWindow):
             'ui_name': '',
             'template': 'Simple Command'
         }
+        # 自動生成 class_name
+        data['class_name'] = self.generate_class_name(data.get('action_name', 'Unnamed'))
+        return data
         
-    def load_templates(self):
+    def set_template_combo(self):
         """載入預設模板"""
-        templates = {
+        self.templates = {
             "Simple Command": {
                 "description": tr("Simple_Command_description"),
-                "has_option": False, "has_dockable": False,
+                "has_option": False, 
+                "has_dockable": False,
                 "main_command": tr("simple_command_template")
             },
             "Dockable Tool": {
                 "description": tr("Dockable_Tool_description"),
-                "has_option": True, "has_dockable": True,
-                "main_command": tr("dockable_tool_main"), "option_command": tr("dockable_tool_option")
+                "has_option": True, 
+                "has_dockable": True,
+                "main_command": tr("dockable_tool_main"), 
+                "option_command": tr("dockable_tool_option")
             },
             "Script Runner": {
                 "description": tr("Script_Runner_description"),
-                "has_option": False, "has_dockable": False,
+                "has_option": False, 
+                "has_dockable": False,
                 "main_command": tr("script_runner_template")
             }
         }
-        self.templates = templates
-        self.template_combo.addItems(templates.keys())
+
+        self.template_combo.addItems(self.templates.keys())
         
     def on_template_changed(self, template_name):
         """當模板改變時"""
@@ -452,67 +458,70 @@ class MenuItemGenerator(QMainWindow):
         
         current_data = self.sync_form_to_data()
         if current_data:
-            self.current_file_data['menuitem'][self.current_menuitem_index] = current_data
+            self.current_file_data['menuitems'][self.current_menuitem_index] = current_data
         
         self.current_menuitem_index = index
-        if index < len(self.current_file_data['menuitem']):
-            menuitem_data = self.current_file_data['menuitem'][index]
+        if index < len(self.current_file_data['menuitems']):
+            menuitem_data = self.current_file_data['menuitems'][index]
             self.load_menuitem_data_to_form(menuitem_data)
     
     def add_new_menuitem(self):
         """添加新的 MenuItem"""
+        new_menuitem = self.get_default_menuitem_data()
+
         if not self.current_file_data:
-            current_form_data = self.sync_form_to_data()
-            if current_form_data and current_form_data.get('action_name', '').strip():
+            current_form_data = new_menuitem
+            if current_form_data :
                 self.current_file_data = {
-                    'imports': ["from menulib.menuitem_interface import MenuItemInterface", "import maya.cmds as cmds"],
+                    'imports': ["from menulib.core.menuitem_interface import MenuItemInterface", "import maya.cmds as cmds"],
                     'menuitem': [current_form_data]
                 }
                 self.current_menuitem_index = 0
-            else:
-                self.current_file_data = {'imports': ["from menulib.menuitem_interface import MenuItemInterface", "import maya.cmds as cmds"], 'menuitem': []}
+            if current_form_data.get('action_name', '').strip():
+                self.current_file_data['menuitems'] = []
         else:
-            if self.current_menuitem_index < len(self.current_file_data['menuitem']):
+            if self.current_menuitem_index < len(self.current_file_data['menuitems']):
                 current_data = self.sync_form_to_data()
                 if current_data:
-                    self.current_file_data['menuitem'][self.current_menuitem_index] = current_data
+                    self.current_file_data['menuitems'][self.current_menuitem_index] = current_data
         
-        new_menuitem = self.get_default_menuitem_data()
-        item_count = len(self.current_file_data['menuitem'])
+        
+        item_count = len(self.current_file_data['menuitems'])
         new_menuitem.update({
             'action_name': f'Unname {item_count + 1}',
-            'class_name': f"NewMenuItem{item_count + 1}",
+            'class_name': f'NewMenuItem{item_count + 1}111',
             'order': 100 + (item_count * 10),
         })
-        
-        self.current_file_data['menuitem'].append(new_menuitem)
         self.current_menuitem_index = item_count
         
+        self.current_file_data['menuitems'].append(new_menuitem)
+        
+        
         self.load_menuitem_data_to_form(new_menuitem)
-        self.template_combo.setCurrentText("Simple Command")
+        #self.template_combo.setCurrentText("Simple Command")
         self.update_menuitem_selector()
         self.update_edit_status()
     
     def remove_current_menuitem(self):
         """移除當前 MenuItem"""
-        if not self.current_file_data or not self.current_file_data['menuitem']:
+        if not self.current_file_data or not self.current_file_data['menuitems']:
             return
             
-        if len(self.current_file_data['menuitem']) <= 1:
+        if len(self.current_file_data['menuitems']) <= 1:
             QMessageBox.warning(self, tr("warning_title"), tr("min_menuitem_warning"))
             return
             
-        menuitem_name = self.current_file_data['menuitem'][self.current_menuitem_index].get('action_name', 'Unknown')
+        menuitem_name = self.current_file_data['menuitems'][self.current_menuitem_index].get('action_name', 'Unknown')
         reply = QMessageBox.question(self, tr("confirm_delete_title"), tr("confirm_delete_menuitem").format(menuitem_name), QMessageBox.Yes | QMessageBox.No)
         
         if reply == QMessageBox.Yes:
-            self.current_file_data['menuitem'].pop(self.current_menuitem_index)
-            if self.current_menuitem_index >= len(self.current_file_data['menuitem']):
-                self.current_menuitem_index = len(self.current_file_data['menuitem']) - 1
+            self.current_file_data['menuitems'].pop(self.current_menuitem_index)
+            if self.current_menuitem_index >= len(self.current_file_data['menuitems']):
+                self.current_menuitem_index = len(self.current_file_data['menuitems']) - 1
             
             self.update_menuitem_selector()
-            if self.current_file_data['menuitem']:
-                self.load_menuitem_data_to_form(self.current_file_data['menuitem'][self.current_menuitem_index])
+            if self.current_file_data['menuitems']:
+                self.load_menuitem_data_to_form(self.current_file_data['menuitems'][self.current_menuitem_index])
         
         self.update_edit_status()    
     
@@ -520,8 +529,8 @@ class MenuItemGenerator(QMainWindow):
         """更新 menuitem 選擇器"""
         self.menuitem_combo.blockSignals(True)
         self.menuitem_combo.clear()
-        if self.current_file_data and self.current_file_data['menuitem']:
-            for i, menuitem in enumerate(self.current_file_data['menuitem']):
+        if self.current_file_data and self.current_file_data['menuitems']:
+            for i, menuitem in enumerate(self.current_file_data['menuitems']):
                 name = menuitem.get('action_name', f'menuitem {i+1}')
                 self.menuitem_combo.addItem(f"{i+1}. {name}")
             self.menuitem_combo.setCurrentIndex(self.current_menuitem_index)
@@ -534,14 +543,6 @@ class MenuItemGenerator(QMainWindow):
     
     def edit_imports(self):
         """編輯 import 項目"""
-        """
-        if not self.current_file_data:
-            self.current_file_data = {
-                'imports': ["from menulib.menuitem_interface import MenuItemInterface", 
-                            "import maya.cmds as cmds"],
-                'menuitem': []
-            }
-        """
         dialog = ImportEditorDialog(self.current_file_data.get('imports', []), self)
         if dialog.exec_() == QDialog.Accepted:
             self.current_file_data['imports'] = dialog.get_imports()
@@ -625,25 +626,25 @@ class MenuItemGenerator(QMainWindow):
         if self.current_file_data and self.current_menuitem_index < len(self.current_file_data.get('menuitem', [])):
             current_data = self.sync_form_to_data()
             if not current_data: return "# Code generation paused due to validation errors."
-            self.current_file_data['menuitem'][self.current_menuitem_index] = current_data
+            self.current_file_data['menuitems'][self.current_menuitem_index] = current_data
 
-        needs_dockable = any(menuitem.get('has_dockable', False) for menuitem in self.current_file_data['menuitem'])
+        needs_dockable = any(menuitem.get('has_dockable', False) for menuitem in self.current_file_data['menuitems'])
         if needs_dockable:
             dockable_import = "from menulib.ui_mixins import DockableUIMixin"
             if dockable_import not in self.current_file_data['imports']:
                 self.current_file_data['imports'].insert(1, dockable_import)
         
-        menuitem_names = [menuitem.get('action_name', 'Unknown') for menuitem in self.current_file_data['menuitem']]
+        menuitem_names = [menuitem.get('action_name', 'Unname') for menuitem in self.current_file_data['menuitems']]
         code_lines = [
             f"# Auto-generated menu items: {', '.join(menuitem_names)}",
             f"# Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-            f"# Contains {len(self.current_file_data['menuitem'])} menuitem(s)",
+            f"# Contains {len(self.current_file_data['menuitems'])} menuitem(s)",
             "",
             *self.current_file_data.get('imports', []),
             ""
         ]
         
-        for i, menuitem_data in enumerate(self.current_file_data['menuitem']):
+        for i, menuitem_data in enumerate(self.current_file_data['menuitems']):
             if i > 0: code_lines.append("")
             code_lines.extend(self._generate_menuitem_class(menuitem_data))
             
@@ -651,7 +652,7 @@ class MenuItemGenerator(QMainWindow):
     
     def _generate_menuitem_class(self, menuitem_data):
         """生成單個 menuitem 類別的代碼"""
-        class_name = menuitem_data.get('class_name', 'Unnamedmenuitem')
+        class_name = self.generate_class_name(menuitem_data.get('action_name', 'Unnamed'))
         base_classes = ["MenuItemInterface"]
         if menuitem_data.get('has_dockable', False):
             base_classes.append("DockableUIMixin")
@@ -659,8 +660,8 @@ class MenuItemGenerator(QMainWindow):
         code_lines = [f"class {class_name}({', '.join(base_classes)}):"]
         
         attrs = {
-            'ACTION_NAME': f'"{menuitem_data.get("action_name", "Unnamed Tool")}"',
-            'MENU_PATH': f'"{menuitem_data.get("menu_path", "")}"',
+            'ACTION_NAME': f'{menuitem_data.get("action_name", "Unnamed Tool")!r}',
+            'MENU_PATH': f'{menuitem_data.get("menu_path", "Tool")!r}',
             'ORDER': f'{menuitem_data.get("order", 100)}'
         }
         if menuitem_data.get('separator_after', False): attrs['SEPARATOR_AFTER'] = 'True'
@@ -711,16 +712,7 @@ class MenuItemGenerator(QMainWindow):
             if reply != QMessageBox.Yes: return
         
         self._init_from()
-        """
-        self.current_file_path = None  
-        self.current_file_data = None
-        self.current_menuitem_index = 0
-        #self.clear_form()
-        
-        self.update_menuitem_selector()
-        self.update_edit_status()
-        self.on_template_changed(self.template_combo.currentText())
-        """
+
         QMessageBox.information(self, tr("new_file_title"), tr("new_file_info"))
         
     def update_edit_status(self):
@@ -732,7 +724,7 @@ class MenuItemGenerator(QMainWindow):
             self.edit_status_label.setStyleSheet("QLabel { color: #6B8E23; font-weight: bold; padding: 4px; }")
             self.generate_btn.setText(tr("update_btn_text"))
         elif self.current_file_data and self.current_file_data.get('menuitem'):
-            menuitem_count = len(self.current_file_data['menuitem'])            
+            menuitem_count = len(self.current_file_data['menuitems'])            
             status_text = tr("new_mode_status").format(menuitem_count)
             self.edit_status_label.setText(status_text)
             self.edit_status_label.setStyleSheet("QLabel { color: #6B8E23; font-weight: bold; padding: 4px; }")
@@ -780,7 +772,7 @@ class MenuItemGenerator(QMainWindow):
         if self.current_file_data and self.current_menuitem_index < len(self.current_file_data.get('menuitem', [])):
             current_data = self.sync_form_to_data()
             if not current_data: return
-            self.current_file_data['menuitem'][self.current_menuitem_index] = current_data
+            self.current_file_data['menuitems'][self.current_menuitem_index] = current_data
         
         current_menuitem = self.sync_form_to_data()
         if not current_menuitem: return
@@ -806,7 +798,7 @@ class MenuItemGenerator(QMainWindow):
             with open(filepath, 'w', encoding='utf-8') as f:
                 f.write(code)
                 
-            menuitem_count = len(self.current_file_data['menuitem']) if self.current_file_data else 1
+            menuitem_count = len(self.current_file_data['menuitems']) if self.current_file_data else 1
             QMessageBox.information(self, tr("success_title"), tr("file_generated_success").format(action_text, filepath, menuitem_count))
             
             self.refresh_files_list()
@@ -1162,7 +1154,8 @@ generator_instance = None
 
 def show_menu_item_generator():
     """顯示菜單項目生成器"""
-    global generator_instance
+    global generator_instance #lLanguageManager
+
     if generator_instance is None:
         generator_instance = MenuItemGenerator()
     generator_instance.show()
