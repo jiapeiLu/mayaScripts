@@ -8,7 +8,7 @@ menu_manager.teardown_menu()
 """
 
 __author__ = "Jiapei Lu & Claude Sonnet 4"
-__version__ = "1.0.0-alpha1" 
+__version__ = "1.0.0-alpha2" 
 
 import logging
 import json
@@ -26,7 +26,7 @@ from PySide2.QtGui import QIcon, QPixmap  # [新增] 支援 Icon
 import maya.OpenMayaUI as omui
 from shiboken2 import wrapInstance
 
-from menulib.plugin_interface import PluginInterface
+from menulib.core.menuitem_interface import MenuItemInterface
 
 
 logger = logging.getLogger("MenuFramework")
@@ -64,7 +64,7 @@ def setup_menu_logging(config):
     logger.info(f"Logger initialized with level: {log_level_str}")
 
 
-def load_config():
+def load_config(configdir):
     """
     載入設定檔 config.json，並提供安全的預設值。
     """
@@ -76,7 +76,7 @@ def load_config():
 
     try:
         # 設定檔路徑與 menu_manager.py 相同
-        config_path = Path(__file__).parent / "config.json"
+        config_path = Path(configdir).parent / "config.json"
         
         if not config_path.exists():
             logger.info("config.json not found. Using default settings.")
@@ -96,7 +96,6 @@ def load_config():
         return default_config
 
 
-# [新增] Icon 載入輔助函數
 def load_icon(icon_path):
     """
     載入 Icon，如果失敗則返回 None
@@ -122,7 +121,8 @@ def load_icon(icon_path):
 
 
 # --- Constants ---
-MENU_ITEMS_DIR = Path(__file__).parent.parent / "menuitems"  # [新增] 生成器產出的插件目錄
+MENU_ITEMS = "menuitems"
+MENU_ITEMS_DIR = Path(__file__).parent.parent / MENU_ITEMS  # [新增] 生成器產出的插件目錄
 MAIN_MENU_OBJECT_NAME = "MyCustomToolsMainMenu"
 
 
@@ -313,7 +313,7 @@ class MenuBarManager:
         plugin_dirs = []
 
         if MENU_ITEMS_DIR.is_dir():
-            plugin_dirs.append(("menu_items", MENU_ITEMS_DIR))
+            plugin_dirs.append( MENU_ITEMS_DIR)
             
         if not plugin_dirs:
             logger.warning("No plugin directories found")
@@ -327,20 +327,21 @@ class MenuBarManager:
         discovered_plugins = []
         seen_orders = set() # 用於檢測重複
 
-        for dir_name, dir_path in plugin_dirs:
+        for dir_path in plugin_dirs:
+            dir_name = dir_path.name
             logger.debug(f"--- Scanning directory: {dir_path} ---")
             
             for filename in sorted(os.listdir(dir_path)):
                 if filename.endswith(".py") and not filename.startswith("__"):
-                    module_name = f"{dir_name}.{filename[:-3]}"
+                    module_name = f"menulib.{dir_name}.{filename[:-3]}"
                     try:
                         module = importlib.import_module(module_name)
                         importlib.reload(module)
                         for item_name in dir(module):
                             plugin_class = getattr(module, item_name)
                             if (isinstance(plugin_class, type) and
-                                    issubclass(plugin_class, PluginInterface) and
-                                    plugin_class is not PluginInterface):
+                                    issubclass(plugin_class, MenuItemInterface) and
+                                    plugin_class is not MenuItemInterface):
                                 
                                 path = getattr(plugin_class, "MENU_PATH", "")
                                 order = getattr(plugin_class, "ORDER", 9999)
@@ -367,7 +368,7 @@ class MenuBarManager:
                                 }
                                 discovered_plugins.append(metadata)
                     except Exception as e:
-                        logger.debug(f"    ! Failed to load plugin from {filename}: {e}")
+                        logger.error(f"!!! Failed to load plugin from {filename}: {e}")
 
         # 2. 排序階段：
         # 使用三層排序，確保結果 100% 可預測
@@ -381,7 +382,8 @@ class MenuBarManager:
         logger.debug("--- Registering discovered plugins in sorted order ---")
         for metadata in sorted_plugins:
             plugin_class = metadata["class"]
-            logger.debug(f"  > Registering: {metadata['action_name']} (Path: {metadata['path']}, Order: {metadata['order']})")
+            logmessage = f"  >Registering: {metadata['action_name'].ljust(20)!r} Path: {metadata['path']},\t Order: {metadata['order']}"
+
             
             instance = plugin_class()
             
@@ -390,9 +392,9 @@ class MenuBarManager:
                 icon = load_icon(metadata['icon_path'])
                 if icon:
                     instance.get_icon = lambda: icon
-                    logger.debug(f"  > {' '*len('Registering')}: Add Icon to {instance.get_action_name()}")
+                    logmessage +=f",\t Icon {metadata['icon_path']!r}"
                     
-                    
+            logger.debug(logmessage)        
             self._plugin_instances.append(instance)
             self._register_plugin(instance)
 
@@ -413,7 +415,7 @@ class MenuBarManager:
                 parent_menu = new_menu
         return parent_menu
 
-    def _register_plugin(self, plugin: PluginInterface):
+    def _register_plugin(self, plugin: MenuItemInterface):
         target_menu = self._find_or_create_submenu(plugin.get_menu_path())
 
         # [修改] 使用 plugin 在列表中的索引作為它的唯一 ID
@@ -441,50 +443,5 @@ class MenuBarManager:
             target_menu.addSeparator()
 
 
-# --- Entry Points for Maya ---
-menu_manager_instance = None
 
-def initialize_menu():
-    """Run this function in Maya to build or rebuild your custom menu."""
-    global menu_manager_instance
-    
-    # [修改] 流程調整
-    # 1. 載入設定
-    config = load_config()
-    
-    # 2. 根據設定，初始化日誌系統
-    setup_menu_logging(config)
-    
-    # 3. 繼續原本的流程
-    logger.info("Initializing Custom Menu...")
-    menu_title = config.get("main_menu_title", "Default Tools")
-
-    if 'menu_manager_instance' in globals() and menu_manager_instance:
-        try: menu_manager_instance.remove_existing_menu()
-        except: pass
-        
-    menu_manager_instance = MenuBarManager(menu_title=menu_title, config=config)
-    menu_manager_instance.build_menu()
-    logger.info("Menu initialization complete.")
-
-
-def teardown_menu():
-    global menu_manager_instance
-    if 'menu_manager_instance' in globals() and menu_manager_instance:
-        menu_manager_instance.remove_existing_menu()
-        menu_manager_instance = None
-
-
-# [新增] 啟動生成器的便捷函數
-def show_generator():
-    """顯示菜單項目生成器"""
-    try:
-        from menulib import menuitem_generator
-        importlib.reload(menuitem_generator)  # 確保載入最新版本
-        show_menu_item_generator = menuitem_generator.show_menu_item_generator
-
-        return show_menu_item_generator()
-    except ImportError as e:
-        logger.error(f"Failed to import menu generator: {e}")
-        return None
         

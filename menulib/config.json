@@ -1,5 +1,7 @@
 {
   "main_menu_title": "Menu Tools",
   "log_modes": ["DEBUG", "INFO", "WARNING", "ERROR"],
-  "log_level": "ERROR" 
+  "log_level": "ERROR" ,
+  "languages_modes":["zh_tw","en_us"],
+  "language": "en_us"
 }

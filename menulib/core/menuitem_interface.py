@@ -1,7 +1,7 @@
 # file: plugin_interface.py
 from abc import ABC, abstractmethod
 
-class PluginInterface(ABC):
+class MenuItemInterface(ABC):
     """
     所有選單外掛都必須繼承的抽象基底類別。
     """

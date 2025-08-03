@@ -35,8 +35,8 @@ vtxMatch.main()
 ```
 
 # menulib 系統提供了以下功能：
-- 自動掃描和載入插件
-- 支援自定義 Icon
+- 自動掃描和載入菜單
+- 支援自定義及內建 Icon
 - 分離按鈕（主功能 + Option Box）
 - Dockable UI 支援
 - 視覺化的菜單項目生成器
@@ -44,15 +44,19 @@ vtxMatch.main()
 ## 目錄結構
 
 ```
-your_project/
-├── menu_manager.py          # 主要管理器
+menulib/
 ├── config.json              # 配置文件（可選）
-├── menulib/                 # 核心庫
+├── core/                    # 核心庫
 │   ├── __init__.py
-│   ├── config.json           # 設定
+│   ├── menu_manager.py         # 主要管理器
+│   ├── menu_item_generator.py  # 生成器工具
 │   ├── menuitem_interface.py   # 插件接口
-│   ├── ui_mixins.py          # UI 混合類
-│   └── menu_item_generator.py # 生成器工具
+│   └── ui_mixins.py            # UI 混合類
+│ 
+├── languagelib/             
+│   └── language.py             # UI 語言包
+│   └── language_manager.py     # 翻譯器
+│ 
 └── menuitems/             
     └── example_tool.py    # 手動編寫的插件範例
     └── vtxMatch.py        # 生成器產出的插件範例
@@ -66,16 +70,16 @@ your_project/
 
 ```python
 # 導入並初始化菜單
-import menulib.menu_manager as menu_manager
-menu_manager.initialize_menu()
+sys.path.append(r"maya\scripts") #the dir where the menulib goes to.
+import menulib
+menulib.initialize_menu()
+#menulib.teardown_menu() # remove menu
 ```
 
 ### 2. 使用生成器創建菜單項目
-
 ```python
 # 啟動菜單項目生成器
-import menulib.menu_manager as menu_manager
-menu_manager.show_generator()
+menulib.show_menu_generator()
 ```
 
 ## 使用生成器
@@ -173,24 +177,22 @@ class MyToolPlugin(PluginInterface):
 ```
 
 ## 配置文件
-
-創建 `config.json` 來自定義設定：
+ `config.json` 自定義設定：
 
 ```json
 {
-    "main_menu_title": "My Custom Tools",
-    "log_level": "INFO",
-    "show_warnings_on_load": false
+  "main_menu_title": "Menu Tools",
+  "log_modes": ["DEBUG", "INFO", "WARNING", "ERROR"],
+  "log_level": "ERROR" ,
+  "languages_modes":["zh_tw","en_us"], 
+  "language": "en_us"
 }
 ```
 
 ## 常見問題
 
-### Q: 如何重新載入菜單？
-A: 重新執行 `menu_manager.initialize_menu()`
-
 ### Q: 生成的文件在哪裡？
-A: 在 `menu_items/` 目錄中
+A: 在 `menulib/menu_items/` 目錄中
 
 ### Q: 如何刪除菜單？
 A: 執行 `menu_manager.teardown_menu()`
